@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iPixel Remote Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #06070d;
+            --card-bg: rgba(18, 20, 32, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #ffffff;
+            --text-secondary: #8e8e9f;
+            --accent-blue: #007aff;
+            --accent-cyan: #00f2fe;
+            --accent-green: #00e676;
+            --accent-red: #ff3b30;
+            --accent-orange: #ff9500;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(79, 172, 254, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(0, 242, 254, 0.05) 0px, transparent 50%);
+            color: var(--text-primary);
+            font-family: 'Outfit', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            overflow-x: hidden;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, var(--text-primary) 30%, #a2a2c2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        p.description {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+        }
+
+        .main-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            width: 100%;
+            max-width: 600px;
+            align-items: center;
+        }
+
+        /* Preview Area */
+        .preview-section {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 24px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(12px);
+            position: relative;
+        }
+
+        .preview-container-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn-swap {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            outline: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            flex-shrink: 0;
+        }
+
+        .btn-swap:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+            transform: scale(1.1) rotate(180deg);
+            box-shadow: 0 0 15px rgba(0, 122, 255, 0.4);
+        }
+
+        .btn-swap:active {
+            transform: scale(0.95) rotate(180deg);
+        }
+
+        /* Glassmorphic Dashboard Cards */
+        .dashboard-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 24px;
+            width: 100%;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #ffffff;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Connection Panels */
+        .devices-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 480px) {
+            .devices-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .device-slot-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .device-slot-card.connected {
+            border-color: rgba(0, 230, 118, 0.2);
+            background: rgba(0, 230, 118, 0.02);
+        }
+
+        .slot-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .slot-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4e4e5e;
+            position: relative;
+        }
+
+        .connected .status-indicator {
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7); }
+            70% { box-shadow: 0 0 0 8px rgba(0, 230, 118, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); }
+        }
+
+        .btn-connect {
+            background: var(--accent-blue);
+            color: #ffffff;
+            border: none;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+            text-align: center;
+        }
+
+        .btn-connect:hover {
+            background: #0063cc;
+            box-shadow: 0 0 10px rgba(0, 122, 255, 0.3);
+        }
+
+        .btn-connect.disconnect {
+            background: rgba(255, 59, 48, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(255, 59, 48, 0.2);
+        }
+
+        .btn-connect.disconnect:hover {
+            background: rgba(255, 59, 48, 0.25);
+        }
+
+        /* Control Form Inputs */
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="text"] {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px 16px;
+            border-radius: 10px;
+            color: #ffffff;
+            font-family: inherit;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 8px rgba(0, 122, 255, 0.25);
+        }
+
+        /* File Upload */
+        .file-upload-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-upload-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px dashed rgba(255, 255, 255, 0.15);
+            padding: 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .file-upload-label:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--accent-blue);
+            color: #ffffff;
+        }
+
+        /* Brightness Control */
+        .brightness-slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Logs Console */
+        .logs-console {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            padding: 12px;
+            color: #00f2fe;
+            height: 100px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            display: flex;
+            flex-direction: column-reverse;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+        }
+
+        .log-time {
+            color: var(--text-secondary);
+            margin-right: 8px;
+        }
+
+        /* Toasts */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            background: rgba(10, 10, 20, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .toast.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="toast" id="toast"></div>
+
+    <header>
+        <h1>iPixel Remote Dashboard</h1>
+        <p class="description">Premium controller and simulator for iPixel BLE matrices.</p>
+    </header>
+
+    <div class="main-layout">
+        <!-- Visual Twin Preview Section -->
+        <section class="preview-section">
+            <div class="card-title" style="width:100%; border:none; margin-bottom:0px;">
+                <span>Digital Twin Simulator</span>
+            </div>
+            <div class="preview-container-wrapper">
+                <div id="preview-container" style="flex-grow:1;"></div>
+                <button class="btn-swap" id="btn-swap" style="display: none;" title="Swap Display Slots">⇄</button>
+            </div>
+        </section>
+
+        <!-- Hardware & Connection Setup -->
+        <section class="dashboard-card">
+            <div class="card-title">
+                <span>Display Connections</span>
+            </div>
+            
+            <div class="devices-grid">
+                <!-- Device 1 Connection Card -->
+                <div class="device-slot-card" id="device-slot-0">
+                    <div class="slot-header">
+                        <span class="slot-name">Display 1</span>
+                        <div class="status-indicator"></div>
+                    </div>
+                    <button class="btn-connect" id="btn-connect-0">Connect BLE</button>
+                    
+                    <div class="brightness-slider-container" id="brightness-container-0" style="display: none;">
+                        <div class="slider-header">
+                            <span>Brightness</span>
+                            <span id="brightness-val-0">70%</span>
+                        </div>
+                        <input type="range" id="brightness-slider-0" min="0" max="100" value="70">
+                    </div>
+                </div>
+
+                <!-- Device 2 Connection Card -->
+                <div class="device-slot-card" id="device-slot-1" style="opacity: 0.5; pointer-events: none;">
+                    <div class="slot-header">
+                        <span class="slot-name">Display 2</span>
+                        <div class="status-indicator"></div>
+                    </div>
+                    <button class="btn-connect" id="btn-connect-1">Connect BLE</button>
+                    
+                    <div class="brightness-slider-container" id="brightness-container-1" style="display: none;">
+                        <div class="slider-header">
+                            <span>Brightness</span>
+                            <span id="brightness-val-1">70%</span>
+                        </div>
+                        <input type="range" id="brightness-slider-1" min="0" max="100" value="70">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Matrix Content Controls -->
+        <section class="dashboard-card">
+            <div class="card-title">
+                <span>Content Controller</span>
+            </div>
+
+            <div class="input-group">
+                <label for="text-input">Render Text</label>
+                <input type="text" id="text-input" value="HELLO" placeholder="Type letters to draw..." maxlength="12">
+            </div>
+
+            <div class="input-group">
+                <label>Upload Matrix Image</label>
+                <div class="file-upload-wrapper">
+                    <input type="file" id="image-input" accept="image/*">
+                    <label for="image-input" class="file-upload-label">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        <span>Choose an Image file...</span>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- Console Logging Area -->
+        <section class="dashboard-card">
+            <div class="card-title" style="border:none; padding:0; font-size:0.9rem;">
+                <span>Console Log</span>
+            </div>
+            <div class="logs-console" id="console-log"></div>
+        </section>
+    </div>
+
+    <!-- Script Integration -->
+    <script type="module">
+        import { IPixelDevice, VirtualDisplay, PixelTextEngine, IPixelPreview } from './index.js';
+
+        let display = new VirtualDisplay({ cols: 1, rows: 1 });
+        const bleDevices = [];
+        let swapped = false;
+
+        // Initialize library's IPixelPreview component
+        const preview = new IPixelPreview(document.getElementById('preview-container'), {
+            cols: 2,
+            rows: 1,
+            labelPrefix: 'Display',
+            onSwap: (isSwapped) => {
+                swapped = isSwapped;
+                if (bleDevices.length >= 2) {
+                    display.swapSlots(0, 1);
+                }
+                logConsole(`Layout slot mapping swapped visually: ${swapped ? 'Display 2 | Display 1' : 'Display 1 | Display 2'}`);
+                triggerDraw();
+            }
+        });
+
+        // Initialize UI Elements
+        const textInput = document.getElementById('text-input');
+        const imageInput = document.getElementById('image-input');
+        const btnSwap = document.getElementById('btn-swap');
+        const consoleLog = document.getElementById('console-log');
+
+        // Setup Connect Handlers
+        document.getElementById('btn-connect-0').addEventListener('click', () => connectDevice(0));
+        document.getElementById('btn-connect-1').addEventListener('click', () => connectDevice(1));
+
+        // Setup Swap Button Handler
+        btnSwap.addEventListener('click', () => {
+            preview.toggleSwap(); // This fires onSwap callback above
+        });
+
+        // Setup Text Input Handlers
+        textInput.addEventListener('input', () => triggerDraw());
+
+        // Setup Image Upload
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const img = new Image();
+            img.onload = () => {
+                const ctx = display.getCanvasContext();
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, display.canvas.width, 32);
+
+                // Draw image across full width of active virtual display
+                ctx.drawImage(img, 0, 0, display.canvas.width, 32);
+                logConsole(`Loaded custom image file (${img.width}x${img.height}) into display canvas.`);
+                syncOutput();
+                
+                // Clear text input to prevent confusing overlaps
+                textInput.value = '';
+                e.target.value = '';
+            };
+            img.src = URL.createObjectURL(file);
+        });
+
+        // Setup Brightness Slider Handlers
+        setupBrightnessSlider(0);
+        setupBrightnessSlider(1);
+
+        function setupBrightnessSlider(index) {
+            const slider = document.getElementById(`brightness-slider-${index}`);
+            const valLabel = document.getElementById(`brightness-val-${index}`);
+            slider.addEventListener('input', (e) => {
+                const val = parseInt(e.target.value);
+                valLabel.textContent = `${val}%`;
+            });
+            slider.addEventListener('change', async (e) => {
+                const val = parseInt(e.target.value);
+                const dev = bleDevices[index];
+                if (dev && dev.connected) {
+                    try {
+                        logConsole(`Setting Display ${index + 1} brightness to ${val}%...`);
+                        await dev.setBrightness(val);
+                        showToast(`Display ${index + 1} brightness set to ${val}%`);
+                    } catch (err) {
+                        logConsole(`Failed to set brightness: ${err.message}`);
+                    }
+                }
+            });
+        }
+
+        async function connectDevice(index) {
+            const btn = document.getElementById(`btn-connect-${index}`);
+            const slotCard = document.getElementById(`device-slot-${index}`);
+            
+            // If already connected, handle disconnect flow
+            if (bleDevices[index] && bleDevices[index].connected) {
+                logConsole(`Disconnecting Display ${index + 1} manually...`);
+                bleDevices[index].disconnect();
+                return;
+            }
+
+            const dev = new IPixelDevice();
+            logConsole(`Requesting Web Bluetooth connection for Display ${index + 1}...`);
+            btn.disabled = true;
+            btn.textContent = "Connecting...";
+
+            try {
+                await dev.connect();
+                bleDevices[index] = dev;
+
+                dev.onDisconnectCallback = (disconnectedDev) => {
+                    logConsole(`GATT event: Display ${index + 1} disconnected.`);
+                    cleanupConnectionUI(index);
+                    triggerDraw();
+                    showToast(`Display ${index + 1} disconnected.`);
+                };
+
+                // Setup connection UI
+                slotCard.classList.add('connected');
+                btn.textContent = "Disconnect";
+                btn.classList.add('disconnect');
+                btn.disabled = false;
+                document.getElementById(`brightness-container-${index}`).style.display = 'block';
+
+                logConsole(`Display ${index + 1} connected successfully!`);
+                showToast(`Display ${index + 1} connected!`);
+
+                syncDevicesLayout();
+                triggerDraw();
+            } catch (err) {
+                console.error(err);
+                logConsole(`Connection failed: ${err.message}`);
+                showToast(`Connection failed.`);
+                btn.disabled = false;
+                btn.textContent = "Connect BLE";
+            }
+        }
+
+        function cleanupConnectionUI(index) {
+            const btn = document.getElementById(`btn-connect-${index}`);
+            const slotCard = document.getElementById(`device-slot-${index}`);
+            slotCard.classList.remove('connected');
+            btn.textContent = "Connect BLE";
+            btn.classList.remove('disconnect');
+            btn.disabled = false;
+            document.getElementById(`brightness-container-${index}`).style.display = 'none';
+            bleDevices[index] = null;
+            
+            syncDevicesLayout();
+        }
+
+        function syncDevicesLayout() {
+            // Count active connections
+            const connectedCount = bleDevices.filter(d => d && d.connected).length;
+            
+            // Re-allocate layout size
+            display = new VirtualDisplay({ cols: connectedCount || 1, rows: 1 });
+            
+            // Register connected devices in slots
+            let activeIdx = 0;
+            bleDevices.forEach((dev) => {
+                if (dev && dev.connected) {
+                    display.registerDevice(activeIdx, dev);
+                    activeIdx++;
+                }
+            });
+
+            if (connectedCount >= 2 && swapped) {
+                display.swapSlots(0, 1);
+            }
+
+            // UI adjustments
+            const slotCard1 = document.getElementById('device-slot-1');
+            if (bleDevices[0] && bleDevices[0].connected) {
+                // Enable Slot 2 card after Slot 1 is connected
+                slotCard1.style.opacity = '1';
+                slotCard1.style.pointerEvents = 'auto';
+            } else {
+                slotCard1.style.opacity = '0.5';
+                slotCard1.style.pointerEvents = 'none';
+            }
+
+            if (connectedCount >= 2) {
+                btnSwap.style.display = 'flex';
+            } else {
+                btnSwap.style.display = 'none';
+                if (swapped) {
+                    swapped = false;
+                    preview.setSwapState(false);
+                }
+            }
+        }
+
+        function triggerDraw() {
+            const text = textInput.value.toUpperCase().trim();
+            const ctx = display.getCanvasContext();
+            
+            // Clear entire logical screen size
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, display.canvas.width, 32);
+
+            if (text.length > 0) {
+                const size = PixelTextEngine.getBestFontSize(ctx, text, display.canvas.width, 24);
+                PixelTextEngine.drawCrispText(ctx, text, size, '#00ffff', 4, 24);
+            }
+
+            syncOutput();
+        }
+
+        async function syncOutput() {
+            preview.update(display.canvas);
+            const hasConnected = bleDevices.some(d => d && d.connected);
+            if (hasConnected) {
+                await display.sync();
+            }
+        }
+
+        function logConsole(msg) {
+            const now = new Date();
+            const timeStr = now.toTimeString().split(' ')[0];
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${timeStr}]</span>${msg}`;
+            consoleLog.insertBefore(entry, consoleLog.firstChild);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('visible');
+            setTimeout(() => toast.classList.remove('visible'), 3000);
+        }
+
+        // Draw initial blank canvas layout
+        triggerDraw();
+        logConsole("Dashboard console ready. Pair displays to begin.");
+    </script>
+</body>
+</html>
