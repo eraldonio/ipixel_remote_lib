@@ -19,5 +19,8 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Update npm to latest
+        run: npm install -g npm@latest
+
       - name: Publish to npm
         run: npm publish --access public --provenance
