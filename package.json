@@ -1,6 +1,6 @@
 {
   "name": "ipixel-remote",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A reusable Web Bluetooth client library for controlling single or multiple iPixel 32x32 LED displays as a single coordinate grid display.",
   "main": "index.js",
   "type": "module",
