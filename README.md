@@ -151,13 +151,19 @@ Digital twin simulator component. Renders live previews of display output inside
 
 ## Browser Compatibility
 
-| Browser | Supported |
-|---|---|
-| Chrome (desktop & Android) | ✅ |
-| Edge | ✅ |
-| Opera | ✅ |
-| Firefox | ❌ (Web Bluetooth not supported) |
-| Safari | ❌ (Web Bluetooth not supported) |
+| Platform | Browser | Supported |
+|---|---|---|
+| 🖥️ Windows / macOS / Linux | Chrome | ✅ Full support |
+| 🖥️ Windows / macOS / Linux | Edge | ✅ Full support |
+| 🖥️ Windows / macOS / Linux | Opera | ✅ Full support |
+| 🖥️ Windows / macOS / Linux | Firefox | ❌ Not supported |
+| 📱 Android | Chrome | ✅ Full support |
+| 📱 Android | Samsung Internet | ⚠️ Partial support |
+| 📱 Android | Firefox | ❌ Not supported |
+| 🍎 iPhone / iPad (iOS) | Any browser | ❌ Not supported |
+
+> [!NOTE]
+> **Why does iOS not work?** Apple requires all browsers on iPhone and iPad to use the **WebKit** rendering engine under the hood. This means Chrome, Firefox, and Edge on iOS are all restricted to WebKit's capabilities — and WebKit does not implement the Web Bluetooth API. This is an Apple platform restriction, not a library limitation. The only path to iPhone support would be a native iOS app using Swift's `CoreBluetooth` framework.
 
 ---
 
