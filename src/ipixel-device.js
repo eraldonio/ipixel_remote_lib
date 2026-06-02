@@ -46,7 +46,8 @@ export class IPixelDevice {
 
     /**
      * Connect to a nearby iPixel LED display using Web Bluetooth.
-     * @param {Object} [customOptions] - Web Bluetooth options (filters/services)
+     * Shows a browser device picker filtered to LED_BLE_ devices.
+     * @param {Object} [customOptions] - Web Bluetooth requestDevice options override
      */
     async connect(customOptions = {}) {
         if (this.connecting || this.connected) return;
@@ -68,7 +69,7 @@ export class IPixelDevice {
                 '00001801-0000-1000-8000-00805f9b34fb',
                 '0000180a-0000-1000-8000-00805f9b34fb'
             ];
-            
+
             const options = Object.assign({
                 filters: [{ namePrefix: 'LED_BLE_' }],
                 optionalServices: servicesList
@@ -80,83 +81,130 @@ export class IPixelDevice {
             this.device.addEventListener('gattserverdisconnected', this._onDisconnect);
 
             this.gattServer = await this.device.gatt.connect();
-            
-            // Wait 1.5s for service discovery initialization to prevent GATT channel conflicts
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            const services = await this.gattServer.getPrimaryServices();
-            
-            let targetService = null;
-            let targetWriteChar = null;
-            let targetNotifyChar = null;
-            for (const s of services) {
-                const shortUUID = getShortUUID(s.uuid);
-                
-                if (shortUUID === 'ae00' || shortUUID === 'fa00' || shortUUID === '00fa' || shortUUID.startsWith('fa')) {
-                    try {
-                        const characteristics = await s.getCharacteristics();
-                        let foundWrite = null;
-                        let foundNotify = null;
-                        for (const c of characteristics) {
-                            const cUUID = getShortUUID(c.uuid);
-                            if (cUUID === 'fa02' || cUUID === 'ae01') {
-                                foundWrite = c;
-                            }
-                            if (cUUID === 'fa03' || cUUID === 'ae02') {
-                                foundNotify = c;
-                            }
-                        }
-                        
-                        if (foundWrite && foundNotify) {
-                            targetWriteChar = foundWrite;
-                            targetNotifyChar = foundNotify;
-                            targetService = s;
-                            if (shortUUID === '00fa' || shortUUID === 'fa00') {
-                                break; // Prioritize fa00/00fa service
-                            }
-                        }
-                    } catch (err) {
-                        console.warn("Characteristic query error in service " + shortUUID, err);
-                    }
-                }
-            }
-
-            if (!targetService || !targetWriteChar || !targetNotifyChar) {
-                throw new Error("Required iPixel GATT characteristics not found.");
-            }
-            
-            this.writeChar = targetWriteChar;
-            this.notifyChar = targetNotifyChar;
-            
-            // Handle notification events
-            this._onNotification = (e) => {
-                const view = e.target.value;
-                const val = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
-                if (val.length >= 5 && val[0] === 0x05) {
-                    const b4 = val[4];
-                    if (b4 === 0 || b4 === 1 || b4 === 3) {
-                        if (this.ackResolver) {
-                            this.ackResolver();
-                        }
-                    }
-                }
-            };
-            this.notifyChar.addEventListener('characteristicvaluechanged', this._onNotification);
-            
-            await this.notifyChar.startNotifications();
-            this.connected = true;
-            this.connecting = false;
-
-            // Sync hardware time to exit default pairing screen
+            await this._setup();
             await this.syncTime();
-
-            // Set standard brightness
             await this.setBrightness(70);
 
         } catch (err) {
             this.handleDisconnect();
             throw err;
         }
+    }
+
+    /**
+     * Discover GATT characteristics and start BLE notifications.
+     * Shared between connect() and autoConnect() to avoid duplication.
+     * @private
+     */
+    async _setup() {
+        // Brief wait for service discovery initialization to prevent GATT channel conflicts
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        const services = await this.gattServer.getPrimaryServices();
+
+        let targetService = null;
+        let targetWriteChar = null;
+        let targetNotifyChar = null;
+
+        for (const s of services) {
+            const shortUUID = getShortUUID(s.uuid);
+            if (shortUUID === 'ae00' || shortUUID === 'fa00' || shortUUID === '00fa' || shortUUID.startsWith('fa')) {
+                try {
+                    const characteristics = await s.getCharacteristics();
+                    let foundWrite = null;
+                    let foundNotify = null;
+                    for (const c of characteristics) {
+                        const cUUID = getShortUUID(c.uuid);
+                        if (cUUID === 'fa02' || cUUID === 'ae01') foundWrite = c;
+                        if (cUUID === 'fa03' || cUUID === 'ae02') foundNotify = c;
+                    }
+                    if (foundWrite && foundNotify) {
+                        targetWriteChar = foundWrite;
+                        targetNotifyChar = foundNotify;
+                        targetService = s;
+                        if (shortUUID === '00fa' || shortUUID === 'fa00') break; // Prioritize fa00/00fa
+                    }
+                } catch (err) {
+                    console.warn('Characteristic query error in service ' + shortUUID, err);
+                }
+            }
+        }
+
+        if (!targetService || !targetWriteChar || !targetNotifyChar) {
+            throw new Error('Required iPixel GATT characteristics not found.');
+        }
+
+        this.writeChar = targetWriteChar;
+        this.notifyChar = targetNotifyChar;
+
+        this._onNotification = (e) => {
+            const view = e.target.value;
+            const val = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+            if (val.length >= 5 && val[0] === 0x05) {
+                const b4 = val[4];
+                if (b4 === 0 || b4 === 1 || b4 === 3) {
+                    if (this.ackResolver) this.ackResolver();
+                }
+            }
+        };
+        this.notifyChar.addEventListener('characteristicvaluechanged', this._onNotification);
+        await this.notifyChar.startNotifications();
+
+        this.connected = true;
+        this.connecting = false;
+    }
+
+    /**
+     * Silently reconnect to all previously paired iPixel displays without showing a picker.
+     *
+     * Uses navigator.bluetooth.getDevices() to retrieve devices the user has already
+     * granted permission to on this origin. Works across tab closes and browser restarts.
+     * On the very first visit the user must pair manually via connect(); all subsequent
+     * visits can use autoConnect() to reconnect without any UI prompt.
+     *
+     * @param {Object}   [options]           - Options object
+     * @param {number}   [options.chunkSize] - BLE write chunk size per device (default: 244)
+     * @param {Function} [options.onConnect] - Called with each IPixelDevice as it connects.
+     *                                         Use this for progressive UI updates when
+     *                                         multiple displays connect at different speeds.
+     * @returns {Promise<IPixelDevice[]>} Array of successfully reconnected IPixelDevice instances.
+     *                                    Devices that fail to reconnect are silently excluded.
+     */
+    static async autoConnect(options = {}) {
+        if (!navigator.bluetooth || typeof navigator.bluetooth.getDevices !== 'function') {
+            console.warn('IPixelDevice.autoConnect: getDevices() is not supported in this browser.');
+            return [];
+        }
+
+        const rememberedDevices = await navigator.bluetooth.getDevices();
+        const ipixelDevices = rememberedDevices.filter(d => d.name && d.name.startsWith('LED_BLE_'));
+
+        if (ipixelDevices.length === 0) return [];
+
+        const { onConnect, ...deviceOptions } = options;
+
+        const results = await Promise.allSettled(
+            ipixelDevices.map(async (bleDevice) => {
+                const instance = new IPixelDevice(deviceOptions);
+                instance.device = bleDevice;
+
+                instance._onDisconnect = () => instance.handleDisconnect();
+                bleDevice.addEventListener('gattserverdisconnected', instance._onDisconnect);
+
+                instance.gattServer = await bleDevice.gatt.connect();
+                await instance._setup();
+                await instance.syncTime();
+                await instance.setBrightness(70);
+
+                if (typeof onConnect === 'function') onConnect(instance);
+
+                return instance;
+            })
+        );
+
+        return results
+            .filter(r => r.status === 'fulfilled')
+            .map(r => r.value);
     }
 
     handleDisconnect() {
@@ -189,7 +237,7 @@ export class IPixelDevice {
 
     /**
      * Write raw bytes to iPixel GATT channel. Handles response-less writes with backoffs.
-     * @param {Uint8Array} payload 
+     * @param {Uint8Array} payload
      */
     async writeValue(payload) {
         try {
@@ -215,7 +263,7 @@ export class IPixelDevice {
     async _waitForAck(timeoutMs = 3000) {
         const token = Symbol('ack');
         this.activeAckToken = token;
-        
+
         return new Promise((resolve) => {
             const localAckResolver = () => {
                 if (this.activeAckToken === token) {
@@ -252,7 +300,7 @@ export class IPixelDevice {
                 now.getSeconds(),
                 0                  // Language
             ]);
-            
+
             const ackPromise = this._waitForAck(3000);
             await this.writeValue(payload);
             await ackPromise;
@@ -278,7 +326,7 @@ export class IPixelDevice {
 
     /**
      * Write a 32x32 PNG file to the display
-     * @param {Uint8Array} pngBytes 
+     * @param {Uint8Array} pngBytes
      */
     async sendImage(pngBytes) {
         if (!this.connected) return;
@@ -297,4 +345,3 @@ export class IPixelDevice {
         });
     }
 }
-

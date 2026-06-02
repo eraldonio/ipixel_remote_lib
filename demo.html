@@ -575,9 +575,8 @@
 
         async function connectDevice(index) {
             const btn = document.getElementById(`btn-connect-${index}`);
-            const slotCard = document.getElementById(`device-slot-${index}`);
-            
-            // If already connected, handle disconnect flow
+
+            // If already connected, disconnect instead
             if (bleDevices[index] && bleDevices[index].connected) {
                 logConsole(`Disconnecting Display ${index + 1} manually...`);
                 bleDevices[index].disconnect();
@@ -587,38 +586,46 @@
             const dev = new IPixelDevice();
             logConsole(`Requesting Web Bluetooth connection for Display ${index + 1}...`);
             btn.disabled = true;
-            btn.textContent = "Connecting...";
+            btn.textContent = 'Connecting...';
 
             try {
                 await dev.connect();
-                bleDevices[index] = dev;
-
-                dev.onDisconnectCallback = (disconnectedDev) => {
-                    logConsole(`GATT event: Display ${index + 1} disconnected.`);
-                    cleanupConnectionUI(index);
-                    triggerDraw();
-                    showToast(`Display ${index + 1} disconnected.`);
-                };
-
-                // Setup connection UI
-                slotCard.classList.add('connected');
-                btn.textContent = "Disconnect";
-                btn.classList.add('disconnect');
-                btn.disabled = false;
-                document.getElementById(`brightness-container-${index}`).style.display = 'block';
-
-                logConsole(`Display ${index + 1} connected successfully!`);
+                registerDeviceToSlot(index, dev);
+                logConsole(`Display ${index + 1} connected: ${dev.device.name}`);
                 showToast(`Display ${index + 1} connected!`);
-
-                syncDevicesLayout();
-                triggerDraw();
             } catch (err) {
                 console.error(err);
                 logConsole(`Connection failed: ${err.message}`);
-                showToast(`Connection failed.`);
+                showToast('Connection failed.');
                 btn.disabled = false;
-                btn.textContent = "Connect BLE";
+                btn.textContent = 'Connect BLE';
             }
+        }
+
+        /**
+         * Wire a connected IPixelDevice into a given slot index.
+         * Used by both manual connectDevice() and auto-connect flows.
+         */
+        function registerDeviceToSlot(index, dev) {
+            bleDevices[index] = dev;
+
+            dev.onDisconnectCallback = () => {
+                logConsole(`GATT event: Display ${index + 1} disconnected.`);
+                cleanupConnectionUI(index);
+                triggerDraw();
+                showToast(`Display ${index + 1} disconnected.`);
+            };
+
+            const btn = document.getElementById(`btn-connect-${index}`);
+            const slotCard = document.getElementById(`device-slot-${index}`);
+            slotCard.classList.add('connected');
+            btn.textContent = 'Disconnect';
+            btn.classList.add('disconnect');
+            btn.disabled = false;
+            document.getElementById(`brightness-container-${index}`).style.display = 'block';
+
+            syncDevicesLayout();
+            triggerDraw();
         }
 
         function cleanupConnectionUI(index) {
@@ -718,7 +725,29 @@
 
         // Draw initial blank canvas layout
         triggerDraw();
-        logConsole("Dashboard console ready. Pair displays to begin.");
+        logConsole('Dashboard ready. Scanning for previously paired displays...');
+
+        // Silently auto-reconnect to any previously paired iPixel displays on this origin.
+        // Each device connects independently via onConnect so the UI updates progressively.
+        (async () => {
+            try {
+                let nextSlot = 0;
+                const found = await IPixelDevice.autoConnect({
+                    onConnect: (dev) => {
+                        if (nextSlot >= 2) return;
+                        const slot = nextSlot++;
+                        registerDeviceToSlot(slot, dev);
+                        logConsole(`Auto-reconnected Display ${slot + 1}: ${dev.device.name}`);
+                        showToast(`Display ${slot + 1} auto-reconnected!`);
+                    }
+                });
+                if (found.length === 0) {
+                    logConsole('No previously paired displays found. Use "Connect BLE" to pair.');
+                }
+            } catch (err) {
+                logConsole(`Auto-connect unavailable: ${err.message}`);
+            }
+        })();
     </script>
 </body>
 </html>

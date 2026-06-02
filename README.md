@@ -43,7 +43,8 @@ Represents a connection session to a single physical iPixel display.
 | Method | Description |
 |---|---|
 | `new IPixelDevice(options?)` | Creates a new BLE controller. Accepts `{ chunkSize }` (default: `244`). |
-| `async connect(options?)` | Opens a device picker filtered to `LED_BLE_` prefix. Syncs time and sets brightness to `70` on success. |
+| `async connect(options?)` | Opens a browser device picker filtered to `LED_BLE_` devices. Syncs time and sets brightness to `70` on success. |
+| `static async autoConnect(options?)` | Silently reconnects to all previously paired iPixel displays **without showing a picker**. Uses `navigator.bluetooth.getDevices()`. Works across tab closes and browser restarts. Accepts `{ onConnect: (dev) => {} }` for per-device progressive UI updates. Returns an array of connected `IPixelDevice` instances. Requires Chrome and a prior manual pairing on this origin. |
 | `disconnect()` | Manually closes the GATT connection. |
 | `async setBrightness(level)` | Sets display brightness. `level` must be a number between `0` and `100`. |
 | `async syncTime()` | Synchronizes the display clock with the current system time. |
